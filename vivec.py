@@ -1,25 +1,4 @@
-""" Sketch for automatic photo taking and database entry
-
-Push Button =========================
-    - give user some feedback
-    
-Take Photo ==========================
-    ? Specify path
-    - Check if path is valid
-    - Acquire new filename 
-    ? How to get new filename
-    - Capture image from camera
-    - Check if image capture successful
-    
-- Database Entry ====================
-    - DEFAULT-> Get date from system and format for db entry
-    - OPTIONAL-> Get Purchase Price and any other data
-    - Build query
-    - Execute query
-    - Feedback to user on success/fail
-    - If fail ???
-    - Prompt user for continue or exit
-    - Exit -> close DB -> exit script"""
+""" """
    
 # 
 import  RPi.GPIO as GPIO
