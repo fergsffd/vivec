@@ -14,7 +14,8 @@ else:
 
 import time
 from datetime import datetime
-from os import listdir,system
+import os, sys
+from os import listdir,system, mknod
 from os.path import isfile, join, expanduser
 import pymysql
 import configparser
@@ -22,7 +23,7 @@ import sys, getopt
 
 
 # Build your friggin .config file!
-CONFIG_FILE_DEFAULT = expanduser('~/vivec/.v_config')
+CONFIG_FILE_DEFAULT = expanduser('~/vivec/.config')
 CONFIG_FILE_FINAL = CONFIG_FILE_DEFAULT
 IMAGE_FILE_PATH_DEFAULT = expanduser("~/vivec/images/")
 IMAGE_FILE_PATH_FINAL = IMAGE_FILE_PATH_DEFAULT
@@ -58,13 +59,17 @@ def main(argv):
          elif opt in ('-t', '--test'):
             HW_MODULE_PRESENT = False
             DB_WRITE = False
-
+################################
 def writable( fn ):
-    if( not isfile( os.mknod( fn, mode=600)) ):
+    #test = os.open(fn, os.O_CREAT)
+    try:
+        test = os.open(fn, os.O_CREAT)
+    except OSError:
         return False
     else:
-        os.remove('fn')
-        return true
+        #os.close( test )
+        os.remove( test )
+        return True
 
 def makeFn(): # Make filename from prefix and timestamp
      #print(listdir(savedir))
@@ -109,28 +114,36 @@ def makeConfig():
 
 #######
 def getConfig(): # Maybe take a command line path to conf file
+    global CONFIG_FILE_FINAL, IMAGE_FILE_PATH_FINAL, IMAGE_PREFIX_FINAL
+
     if( not isfile(CONFIG_FILE_FINAL)):
-        print('Cannot locate config file:', CONFIG_FILE_FINAL, end='')
+        print('Cannot locate config file:', CONFIG_FILE_FINAL)
         if( input('Make a configuration file? [y/n]') == 'y'):
             c_done = False
             while( not c_done):
-                fn = input('Path for config file, (x) to exit:[',CONFIG_FILE_FINAL,']:')
+                msg = 'Path for config file, (x) to exit:[' + CONFIG_FILE_FINAL + ']:'
+                fn = input(msg)
                 if( fn == ''):
                     fn = CONFIG_FILE_FINAL
-                else if( fn == 'x'):
+                elif( fn == 'x'):
                     return False
                 fn = expanduser(fn)
                 if( not writable( fn )):
-                   print('Unable to create file as specified:', fn, end='')
+                   print('Unable to create file as specified:', fn)
                 else:
                     c_done = true
                     CONFIG_FILE_FINAL = fn
+        else:
+            print('Cancelled config file creation')
+            return False
+
         c_done = False
         while( not c_done):
-            fp = input('Image file path, (x) to exit:[',IMAGE_FILE_PATH_FINAL,']:')
+            msg = 'Image file path, (x) to exit:[' +IMAGE_FILE_PATH_FINAL + ']:'
+            fp = input(msg)
             if( fp == ''):
                 fp = IMAGE_FILE_PATH_FINAL
-            else if( fp == 'x'):
+            elif( fp == 'x'):
                 return False
             fn = expanduser(fp) + "test"
             if( not writable( fn )):
@@ -140,10 +153,11 @@ def getConfig(): # Maybe take a command line path to conf file
                 IMAGE_FILE_PATH_FINAL = fp
         c_done = False
         while( not c_done):
-            i = input('Image filename prefix, (x) to exit:[',IMAGE_PREFIX_FINAL,']:')
+            msg = 'Image filename prefix, (x) to exit:['+IMAGE_PREFIX_FINAL +']:'
+            i = input(msg)
             if( i == 'x'):
                 return False
-            if( i == ''):
+            elif( i == ''):
                 c_done = True
             else:
                 c_done = True
@@ -152,15 +166,7 @@ def getConfig(): # Maybe take a command line path to conf file
     dbName=''
     dbUser=''
     dbpasswd=''
-    while( not done ):
-        x = input('would you like to create one (y/n)? ')
-        if( x == 'y' ):
-            fnPath = input('Directory to store image files? [', fnPath, ']',  end='')
-            if( not os.path_isdir( os.path.expanduser(fnPath))):
-                fnPrefix = input('Image filename prefix? ', end='')
-        else:
-            done = True
-            exit() #####
+    return False
 ###### Main ######
 if __name__ == "__main__":
     main(sys.argv[1:])
@@ -170,22 +176,5 @@ done = False
 if( not getConfig()):
     print('Problem with loading config file')
 
-x = 0
-msg = "ended"
 
-while not done:
-    a = input('(s)how, (a)dd or e(x)it', end='')
-if( input('?') != 'x'):
-     # if GPIO.event_detected(pinNum):
-    print('button pressed')
-    makeQuery(sdir)
-    x+=1
-    if ( x> 3 ):
-         done = True
-         msg = 'reached button pressed limit'
-    else:
-         exit()
-
-# End main loop
-print("program", msg)
 exit()
