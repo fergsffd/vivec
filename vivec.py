@@ -1,7 +1,18 @@
 """ Python3 """
 
 #
-import  RPi.GPIO as GPIO
+try:
+    import  RPi.GPIO as GPIO
+except:
+    print('No Raspberry Pi modules available')
+    HW = False
+else:
+    pinNum = 18
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(pinNum, GPIO.IN,pull_up_down=GPIO.PUD_UP)
+    GPIO.add_event_detect(pinNum, GPIO.RISING,bouncetime=200)
+    HW = True
+
 import time
 from datetime import datetime
 from os import listdir,system
@@ -10,11 +21,7 @@ import pymysql
 import configparser
 
 
-pinNum = 18
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(pinNum, GPIO.IN,pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(pinNum, GPIO.RISING,bouncetime=200)
 
 # Build your friggin .config file!
 IMAGE_FILE_PATH = "~/vivec/images/"
@@ -45,7 +52,7 @@ def doQuery(  ):
      print("doQuery")
 
 #######
-def (checks): # Sanity checks
+def checks(): # Sanity checks
     print("Sanity checks") # Do more robust checking
 
     try:
@@ -55,15 +62,15 @@ def (checks): # Sanity checks
         exit()
 
     try:
-	print('Check for disk writability?')
+	    print('Check for disk writability?')
     except:
-	print('Unable to write image files to:', IMAGE_FILE_PATH, end='')
+	    print('Unable to write image files to:', IMAGE_FILE_PATH, end='')
 
     try:
         db = pymysql.connect( user=DB_USERNAME, passwd=DB_PWD, db=DB_NAME)
     except:
-	print('Problem with database: ', DB_NAME, end='')
-	exit()
+	    print('Problem with database: ', DB_NAME, end='')
+	    exit()
     cur = db.cursor()
 
     try:
@@ -74,28 +81,27 @@ def (checks): # Sanity checks
 #######
 def getConfig( confFn="~/.vivec/vivec.conf"): # Maybe take a command line path to conf file
     done = False
-    try:
-         if( not isfile(confFn ):
-             print('Cannot locate config file:', confFn, end='')
-	     fnPath= confFn
-	     fnPrefix=''
-	     dbName=''
-	     dbUser=''
-	     dbpasswd=''
-	     while( not done ):
-                 x = input('would you like to create one (y/n)? ')
-		 if( x == 'y' ):
 
-                    fnPath = input('Directory to store image files? [', fnPath, ']'  end='')
-		    if( not os.path_isdir( os.path.expanduser(fnPath)):
-		    fnPrefix = input('Image filename prefix? ', end='')
-		    dbName
+    if( not isfile('/home/pi/')):
+        print('Cannot locate config file:', confFn, end='')
+
+    fnPath= confFn
+    fnPrefix=''
+    dbName=''
+    dbUser=''
+    dbpasswd=''
+    while( not done ):
+        x = input('would you like to create one (y/n)? ')
+        if( x == 'y' ):
+            fnPath = input('Directory to store image files? [', fnPath, ']',  end='')
+            if( not os.path_isdir( os.path.expanduser(fnPath))):
+                fnPrefix = input('Image filename prefix? ', end='')
 
 ###### Main ######
 
 
 done = False
-if( not getConfig():
+if( not getConfig()):
     print('Problem with loading config file')
 
 x = 0
@@ -103,16 +109,16 @@ msg = "ended"
 
 while not done:
     a = input('(s)how, (a)dd or e(x)it')
- if( input('?') != 'x'):
+if( input('?') != 'x'):
      # if GPIO.event_detected(pinNum):
-     print('button pressed')
-     makeQuery(sdir)
-     x+=1
-     if ( x> 3 ):
+    print('button pressed')
+    makeQuery(sdir)
+    x+=1
+    if ( x> 3 ):
          done = True
          msg = 'reached button pressed limit'
- else:
-     exit()
+    else:
+         exit()
 
 # End main loop
 print("program", msg)
