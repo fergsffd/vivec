@@ -21,7 +21,6 @@ import pymysql
 import configparser
 import sys, getopt
 
-
 # Build your friggin .config file!
 CONFIG_FILE_DEFAULT = expanduser('~/vivec/.config')
 CONFIG_FILE_FINAL = CONFIG_FILE_DEFAULT
@@ -35,14 +34,16 @@ DB_WRITE = True
 DB_USERNAME = ""
 DB_NAME = ""
 DB_PWD = ""
+##
 TIMEOUT = 12 # Program will end
+TEST = False
+
 
 def printUsage():
     print('Usage: vivec.py [OPTION]')
     print(' -h,  --help                   usage information')
     print(' -c,  --config="<configfile>"  path to configuration file')
     print(' -t   --test                   no hardware or db writes')
-
 ###########################
 def main(argv):
      try:
@@ -57,26 +58,27 @@ def main(argv):
          elif opt in ("-c", "--config"):
             IMAGE_FILE_PREFIX_FINAL = arg
          elif opt in ('-t', '--test'):
-            HW_MODULE_PRESENT = False
+            TEST = True
             DB_WRITE = False
 ################################
-def writable( fn ):
+def writable( fn ): # Is ther a better way to test?
     #test = os.open(fn, os.O_CREAT)
     try:
         test = os.open(fn, os.O_CREAT)
     except OSError:
+        print('OS error')
         return False
     else:
         #os.close( test )
-        os.remove( test )
+        print(' removing ',fn)
+        os.remove( fn )
         return True
-
+###
 def makeFn(): # Make filename from prefix and timestamp
      #print(listdir(savedir))
      dt = datetime.today()
      fn = IMAGE_FILE_PATH_FINAL + IMAGE_PREFIX_FINAL + dt.strftime("%y%m%d%H%M%S")
      return(fn)
-
 def getImage(sdir):
      cam = CAMERA_CAPTURE_COMMAND + makeFn() + '.jpg'
      system(cam)
@@ -84,97 +86,84 @@ def getImage(sdir):
 def makeQuery():
      print("makeQuery")
      getImage();
-
 def doQuery(  ):
      print("doQuery")
-
-#######
-def checks(): # Sanity checks
-    print("Sanity checks") # Do more robust checking
-
-    try:
-        sdir = expanduser(IMAGE_FILE_PATH_FINAL)
-    except:
-        print('Problem with image file path: ',IMAGE_FILE_PATH_FINAL, end='')
-        exit()
-
-    try:
-        db = pymysql.connect( user=DB_USERNAME, passwd=DB_PWD, db=DB_NAME)
-    except:
-	    print('Problem with database: ', DB_NAME, end='')
-	    exit()
-    cur = db.cursor()
-
-    try:
-         print('checking for camera...')
-    except:
-         print('Unable to find camera')
+###
 def makeConfig():
+    global CONFIG_FILE_FINAL, IMAGE_FILE_PATH_FINAL, IMAGE_PREFIX_FINAL
+    done = False
     print("Let's make a config file")
+    while( not done):
+        msg = 'Path for config file, (x) to exit:[' + CONFIG_FILE_FINAL + ']:'
+        fn = input(msg)
+        if( fn == ''):
+            fn = CONFIG_FILE_FINAL
+        elif( fn == 'x'):
+            return False
+        fn = expanduser(fn)
+        if( not writable( fn )):
+           print('Unable to create file as specified:', fn)
+        else:
+            done = True
+            CONFIG_FILE_FINAL = fn
+    done = False
+    while( not done):
+        msg = 'Image file path, (x) to exit:[' +IMAGE_FILE_PATH_FINAL + ']:'
+        fp = input(msg)
+        if( fp == ''):
+            fp = IMAGE_FILE_PATH_FINAL
+        elif( fp == 'x'):
+            return False
+        fn = expanduser(fp) + "test"
+        print('fn = ',fn)
+        if( not writable( fn )):
+           print('Unable to create image file in directory:', IMAGE_FILE_PATH_FINAL)
+        else:
+            done = True
+            IMAGE_FILE_PATH_FINAL = fp
+    done = False
+    while( not done):
+        msg = 'Image filename prefix, (x) to exit:['+IMAGE_PREFIX_FINAL +']:'
+        i = input(msg)
+        if( i == 'x'):
+            return False
+        elif( i == ''):
+            done = True
+        else:
+            done = True
+            IMAGE_PREFIX_FINAL = i #Should check for valid text
 
+    dbName=''
+    dbUser=''
+    dbpasswd=''
+    return True
 #######
 def getConfig(): # Maybe take a command line path to conf file
     global CONFIG_FILE_FINAL, IMAGE_FILE_PATH_FINAL, IMAGE_PREFIX_FINAL
 
     if( not isfile(CONFIG_FILE_FINAL)):
+        done = False
         print('Cannot locate config file:', CONFIG_FILE_FINAL)
-        if( input('Make a configuration file? [y/n]') == 'y'):
-            c_done = False
-            while( not c_done):
-                msg = 'Path for config file, (x) to exit:[' + CONFIG_FILE_FINAL + ']:'
-                fn = input(msg)
-                if( fn == ''):
-                    fn = CONFIG_FILE_FINAL
-                elif( fn == 'x'):
-                    return False
-                fn = expanduser(fn)
-                if( not writable( fn )):
-                   print('Unable to create file as specified:', fn)
-                else:
-                    c_done = true
-                    CONFIG_FILE_FINAL = fn
-        else:
-            print('Cancelled config file creation')
-            return False
-
-        c_done = False
-        while( not c_done):
-            msg = 'Image file path, (x) to exit:[' +IMAGE_FILE_PATH_FINAL + ']:'
-            fp = input(msg)
-            if( fp == ''):
-                fp = IMAGE_FILE_PATH_FINAL
-            elif( fp == 'x'):
-                return False
-            fn = expanduser(fp) + "test"
-            if( not writable( fn )):
-               print('Unable to create image file in directory:', IMAGE_FILE_PATH_FINAL, end='')
+        while( not done):
+            if( input('Make a configuration file? [y/n]') == 'y'):
+                done = makeConfig()
             else:
-                c_done = true
-                IMAGE_FILE_PATH_FINAL = fp
-        c_done = False
-        while( not c_done):
-            msg = 'Image filename prefix, (x) to exit:['+IMAGE_PREFIX_FINAL +']:'
-            i = input(msg)
-            if( i == 'x'):
-                return False
-            elif( i == ''):
-                c_done = True
-            else:
-                c_done = True
-                IMAGE_PREFIX_FINAL = i #Should check for valid text
+                print('Config file unavailable. Exiting')
+                exit()
+    print('getConfig success')
+    return True
+###
+def prtConfig(): #Print config fileinfo
+    return True
 
-    dbName=''
-    dbUser=''
-    dbpasswd=''
-    return False
 ###### Main ######
 if __name__ == "__main__":
     main(sys.argv[1:])
+
 if( not HW_MODULE_PRESENT ):
     print('No Raspberry Pi modules available')
 done = False
 if( not getConfig()):
     print('Problem with loading config file')
-
 
 exit()
