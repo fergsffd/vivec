@@ -14,12 +14,11 @@ else:
 
 import time
 from datetime import datetime
-import os, sys
+import os, sys, getopt
 from os import listdir,system, mknod
 from os.path import isfile, join, expanduser
 import pymysql
 import configparser
-import sys, getopt
 
 # Build your friggin .config file!
 CONFIG_FILE_DEFAULT = expanduser('~/vivec/.config')
