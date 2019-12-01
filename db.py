@@ -23,7 +23,7 @@ def dbAvailable( dbw=DB_WHERE,  dbu=DB_USERNAME, dbp=DB_PWD, dbn=DB_NAME):
         db.close()
     except:
         pass
-    return isgood
+    return isgoods
 
 def dbCursor():
     print('dbCursor')
@@ -42,4 +42,4 @@ def dbQuery( cur ):
     print('dbQuery')
     return True
 ##############################
-dbAvailable(dbn='monsoon' )
+dbAvailable(  )
