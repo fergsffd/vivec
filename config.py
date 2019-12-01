@@ -23,12 +23,12 @@ def cameraCmdCheck( x=CC_COMMAND, silent=False):
             break
 
     cam = x[:i]
-    if( not silent ): print('cam: ', cam)
+
     if( not isfile(cam) ):
-        if (not silent): print('Command does not exist.')
+        if (not silent): print('Command >', cam,'< does not exist.')
         return False
         if( not os.access( cam, os.X_OK) ):
-            if( not silent): print('Command is not executable')
+            if( not silent): print('Command >', cam,'<is not executable')
             return  False
         else:
             return True
@@ -60,14 +60,14 @@ def writable( fp ): # Is ther a better way to test?
         os.remove( fn )
         return True
 ###
-
-def inputConfig():
-    print('Using config file ', CONFIG_FILE)
+def inputConfig(fd=False,fp=False,dbn=False,dbu=False,dbp=False,cam=False):
+# the recieved parameters determine if we need to config specified value(s)
 
     global IMAGE_FP, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND
 
-    done = False
-    while( not done ):
+    print('Using config file ', CONFIG_FILE)
+    dict = {}
+    while( not fd ):
         msg = 'Image directory:[' + IMAGE_FP + ']'
         x = input(msg)
         if( x != ''):
@@ -76,18 +76,18 @@ def inputConfig():
             if( not writable(IMAGE_FP)):
                 print('Cannot write files to directory->', IMAGE_FP)
             else:
-                dict = { 'fn_path' : IMAGE_FP }
-                done = True
-    done = False
-    while( not done):
+                dict['fn_path']= IMAGE_FP
+                fd = True
+
+    while( not fp ):
         msg = 'Image file prefix:[' + IMAGE_PREFIX + ']'
         x = input(msg )
         if( x != ''): #Do more checking for legit filename
             IMAGE_PREFIX = x
         dict['fn_prefix'] = IMAGE_PREFIX
-        done = True
-    done = False
-    while( not done ): #Get a list of available DBs?
+        fp = True
+
+    while( not dbn ): #Get a list of available DBs?
         msg = 'Database name:[' + DB_NAME + ']'
         x = input(msg)
         if( x != ''): #Do more checking for legit dbname
@@ -96,9 +96,9 @@ def inputConfig():
             print('Database name cannot be blank')
         else:
             dict['db_name'] = DB_NAME
-            done = True
-    done = False
-    while( not done ):
+            dbn = True
+
+    while( not dbu ):
         msg = 'Database username:['+ DB_USER +']'
         x = input(msg)
         if( x != ''):
@@ -107,9 +107,9 @@ def inputConfig():
             print('Database username cannot be blank')
         else:
             dict['db_user'] = DB_USER
-            done = True
-    done = False
-    while( not done ): #Get a list of available DBs?
+            dbu = True
+
+    while( not dbp ): #Get a list of available DBs?
         msg = 'Database passwd:[' + DB_PWD +']'
         x = input(msg)
         if( x != ''):
@@ -118,22 +118,23 @@ def inputConfig():
             print('Database password cannot be blank')
         else:
             dict['db_pass'] = DB_PWD
-            done = True
-    done = False
-    while( not done ):
+            dbp = True
+
+    while( not cam ):
         msg = 'Camera capture command:['+ CC_COMMAND + ']'
         cc = input(msg)
         if( cc != '' ):
-            if( cameraCmdCheck( cc ) ):
+            if( cameraCmdCheck( cc, silent=False) ):
                 CC_COMMAND = cc
-                done = True
+                cam = False
             else:
-                if( input('Cannot locate command. Retry?[y/n]') != 'y'):
-                    done = True
+                if( input('Cannot locate command. Retry?[y]') != 'y'):
+                    cam = True
+                else:
+                    cam = False
         else:
-            done = True
+            cam = True
     dict['camera'] = CC_COMMAND
-
 
     if( not parser.has_section(CONFIG_SECTION_NAME) ):
         parser.add_section(CONFIG_SECTION_NAME)
@@ -148,7 +149,7 @@ def inputConfig():
     return True
 ## end inputConfig
 
-def loadConfig( show=True ): #Loads values
+def loadConfig( show=True ):
     global IMAGE_FP, IMAGE_PREFIX, DB_PWD, DB_NAME
     global DB_USER, CC_COMMAND
     parser.read(CONFIG_FILE)
@@ -158,9 +159,7 @@ def loadConfig( show=True ): #Loads values
        for k,v in parser.items(sect):
           if( show ):
               print(' {} = {}'.format(k,v))
-          if( k == 'fn_path') :
-              IMAGE_FP = expanduser(v)
-              checkDir(IMAGE_FP, False, 'Image ')
+          if( k == 'fn_path') :  IMAGE_FP = expanduser(v)
           if( k == 'fn_prefix'): IMAGE_PREFIX = v
           if( k == 'db_name'):   DB_NAME = v
           if( k == 'db_user'):   DB_USER = v
@@ -171,28 +170,46 @@ def loadConfig( show=True ): #Loads values
 ###
 def checkConfig(silent=False):
 # Coded this function to use possible future robust validity checks
-    isgood = True
+#
+    if( not silent ): print('checking config file')
+    dict = { 'isgood' : True }
     if( not checkDir(IMAGE_FP, False, "Image " )):
-        print('Problem with image directory. Suggest you edit config file')
-        isgood = False
+        print('Problem with image directory.')
+        dict['fd'] = True
+        dict['isgood'] = False
+
     if( IMAGE_PREFIX == ''):
         print('Probem with image file prefix(is blank)')
-        isgood = False
+        dict['fp'] = True
+        dict['isgood'] = False
+
     if( DB_PWD == ''):
         print('Problem with database password(is blank)')
-        isgood = False
+        dict['dbp'] = True
+        dict['isgood'] = False
+
     if( DB_USER == ''):
         print('Problem with database username(is blank)')
-        isgood = False
+        dict['dbu'] = True
+        dict['isgood'] = False
+
     if( DB_NAME == ''):
         print('Problem with database name(is blank)')
-        isgood = False
-    if( not cameraCmdCheck( CC_COMMAND, True)):
-        print('Problem with camera command')
-        isgood = False
-    return isgood
-#########################################################
+        dict['dbn'] = True
+        dict['isgood'] = False
 
+    if( not cameraCmdCheck( CC_COMMAND, True )):
+        print('Problem with camera command')
+        dict['cam'] = True
+        dict['isgood'] = False
+
+    if( dict['isgood'] ): print(' config OK')
+    return dict
+### end checkConfig
+
+#########################################################
+##### main
+#########################################################
 parser = configparser.ConfigParser()
 if( not isfile(expanduser(CONFIG_FILE)) ):
     print('Cannot locate config file:',CONFIG_FILE)
@@ -207,16 +224,18 @@ if( not isfile(expanduser(CONFIG_FILE)) ):
 
 done = False
 loadConfig(False)
-if( not checkConfig() ):
+conf_chk = checkConfig()
+if( not conf_chk['isgood'] ):
     ans = input('Do you wish to edit config file? [y] ')
+    del conf_chk['isgood']
     if( ans == 'y' or ans == '' ):
-        inputConfig()
+        inputConfig( **conf_chk )
 while ( not done ):
     x = input('(s)how, (e)dit or e(x)it? ')
     if( x == 's'):
         loadConfig(True)
     if( x == 'e'):
-        inputConfig()
+        inputConfig( )
     if( x == 'x'):
         done = True
 exit()
