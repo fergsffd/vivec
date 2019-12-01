@@ -2,8 +2,8 @@
 import pymysql
 
 DB_NAME = 'Shoes'
-DB_USERNAME = 'ferg'
-DB_PWD = 'fireman'
+DB_USERNAME = ''
+DB_PWD = ''
 
 # Test DB access. Can I return itemized DB access failures?
 def dbAvailable( dbn=DB_NAME, dbu=DB_USERNAME, dbp=DB_PWD):
@@ -16,4 +16,3 @@ def dbCursor():
 
 # Setup DB if not exist
 def dbConfig():
-    
