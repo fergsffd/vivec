@@ -2,8 +2,8 @@
 import pymysql
 
 DB_NAME = 'mydb'
-DB_USERNAME = 'cjferg'
-DB_PWD = '9612729issiS#'
+DB_USERNAME = ''
+DB_PWD = ''
 DB_WHERE = 'LOCALHOST'
 
 # Test DB access. Can I return itemized DB access failures?
@@ -42,4 +42,4 @@ def dbQuery( cur ):
     print('dbQuery')
     return True
 ##############################
-dbAvailable(dbu='monsoon' )
+dbAvailable(dbn='monsoon' )
