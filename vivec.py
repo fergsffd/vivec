@@ -21,8 +21,9 @@ import pymysql
 import configparser
 
 ## Globals
+TEST = False
 CONFIG_FILE = os.getcwd() +'/.vconfig'
-IMAGE_FP = os.getcwd() + "/vivec/images/"
+IMAGE_FP = os.getcwd() + "/images/"
 IMAGE_PREFIX = "image"
 CC_COMMAND = "/usr/bin/raspistill -vf -hf -t 10 -o " # Camera Capture
 DB_USER = ""
@@ -116,10 +117,12 @@ def writable( fp ): # Is ther a better way to test?
         os.remove( fn )
         return True
 ###
-def inputConfig(fd=False,fp=False,dbn=False,dbu=False,dbp=False,cam=False):
+def inputConfig(fd=False,fp=False,dbn=False,
+    dbu=False,dbp=False,cam=False,dbh=False):
 # the recieved parameters determine if we need to config specified value(s)
 
     global IMAGE_FP, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND
+    global DB_WHERE
 
     print('Using config file ', CONFIG_FILE)
     dict = {}
@@ -176,6 +179,17 @@ def inputConfig(fd=False,fp=False,dbn=False,dbu=False,dbp=False,cam=False):
             dict['db_pass'] = DB_PWD
             dbp = True
 
+    while( not dbh ): #Get a list of available DBs?
+        msg = 'Hostname:[' + DB_WHERE +']'
+        x = input(msg)
+        if( x != ''):
+            DB_WHERE = x
+        if( DB_WHERE == ''):
+            print('Database hostname cannot be blank')
+        else:
+            dict['db_host'] = DB_WHERE
+            dbh = True
+
     while( not cam ):
         msg = 'Camera capture command:['+ CC_COMMAND + ']'
         cc = input(msg)
@@ -192,17 +206,22 @@ def inputConfig(fd=False,fp=False,dbn=False,dbu=False,dbp=False,cam=False):
             cam = True
     dict['camera'] = CC_COMMAND
 
+    parser = configparser.ConfigParser()
     if( not parser.has_section(CONFIG_SECTION_NAME) ):
         parser.add_section(CONFIG_SECTION_NAME)
     for key, value in dict.items():
         parser.set(CONFIG_SECTION_NAME, key, value)
-    file = open(CONFIG_FILE,'w')
-
-    parser.write(file)
-    file.close()
-    print('config file written')
-
-    return True
+    print('Variables to be written to config file:')
+    loadConfig()
+    if( input('Save?[y]') != 'y'):
+        print('Changes not saved')
+        return False
+    else:
+        file = open(CONFIG_FILE,'w')
+        parser.write(file)
+        file.close()
+        print('Changes saved')
+        return True
 ## end inputConfig
 
 def loadConfig( show=True ):
@@ -254,6 +273,11 @@ def checkConfig(silent=False):
         dict['dbn'] = True
         dict['isgood'] = False
 
+    if( DB_WHERE == ''):
+        print('Problem with database host(is blank)')
+        dict['db_host'] = True
+        dict['isgood'] = False
+
     if( not cameraCmdCheck( CC_COMMAND, True )):
         print('Problem with camera command')
         dict['cam'] = True
@@ -263,19 +287,7 @@ def checkConfig(silent=False):
     return dict
 ### end checkConfig
 
-"""parser = configparser.ConfigParser()
-if( not isfile(expanduser(CONFIG_FILE)) ):
-    print('Cannot locate config file:',CONFIG_FILE)
-    x = input('Create config file?[y/n]')
-    if( x == 'y'):
-        if( not inputConfig() ):
-            print('inputConfig failed -- exiting')
-            exit()
-    else:
-        print('Cannot proceed without config file -- exiting')
-        exit()"""
-
-#================= End onfig stuff ======================
+#================= End config stuff ======================
 
 def printUsage():
     print('Usage: vivec.py [OPTION]')
@@ -284,6 +296,8 @@ def printUsage():
     print(' -t   --test                   no hardware or db writes')
 ###########################
 def main(argv):
+
+     global CONFIG_FILE
      try:
          opts, args = getopt.getopt(argv,"htc:",['help','test',"config="])
      except getopt.GetoptError:
@@ -294,33 +308,44 @@ def main(argv):
             printUsage()
             sys.exit()
          elif opt in ("-c", "--config"):
-            if( isfile(arg) ):
-                CONFIG_FILE = arg
+            cnf = expanduser( arg )
+            if( isfile( cnf )):
+                CONFIG_FILE = cnf
             else:
                 print('config file does not exist')
                 exit()
          elif opt in ('-t', '--test'):
             TEST = True
-     parser = configparser.ConfigParser()
-     print('Cannot locate config file:',CONFIG_FILE)
-     x = input('Create config file?[y/n]')
-     if( x == 'y'):
-         if( not inputConfig() ):
-             print('inputConfig failed -- exiting')
+
+     if( not isfile(CONFIG_FILE)):
+         print('Cannot locate config file:',CONFIG_FILE)
+         x = input('Create config file?[y]')
+         if( x == 'y'):
+             if( not inputConfig() ):
+                 print('inputConfig failed -- exiting')
+                 exit()
+         else:
+             print('Cannot proceed without config file -- exiting')
              exit()
-     else:
-         print('Cannot proceed without config file -- exiting')
-         exit()
+     chk_config = checkConfig()
+     if( not chk_config['isgood']):
+         del chk_config['isgood']
+         done = False
+         print('Problem with config. Would you like to enter new config param?')
+         while( not done ):
+             if( input('[y]') == 'y'):
+                 if( inputConfig( **chk_config ) ):
+                     done = True
+                 else:
+                     print('Try again?', end='')
+             else:
+                 done =True
+# Phew! config stuff done!
+
 ################################
 
 ###### Main ######
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-if( not HW_MODULE_PRESENT ):
-    print('No Raspberry Pi modules available')
-done = False
-if( not getConfig()):
-    print('Problem with loading config file')
 
 exit()
