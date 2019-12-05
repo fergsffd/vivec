@@ -21,7 +21,7 @@ import pymysql
 import configparser
 
 ## Globals
-TEST = False
+TEST = False # Not checking hardware or writing to db
 CONFIG_FILE = os.getcwd() +'/.vconfig'
 IMAGE_FP = os.getcwd() + "/images/"
 IMAGE_PREFIX = "image"
@@ -29,28 +29,29 @@ CC_COMMAND = "/usr/bin/raspistill -vf -hf -t 10 -o " # Camera Capture
 DB_USER = ""
 DB_NAME = "vivecdb"
 DB_PWD = ""
-DB_WHERE = 'LOCALHOST'
+DB_HOST = 'LOCALHOST'
 CONFIG_SECTION_NAME = 'SETTINGS'
 
 #============ Database code ===========================
 # Test DB access. Can I return itemized DB access failures?
-def dbAvailable( dbw=DB_WHERE,  dbu=DB_USER, dbp=DB_PWD, dbn=DB_NAME):
-    print('DB available?')
+def dbAvailable( dbw=DB_HOST,  dbu=DB_USER, dbp=DB_PWD, dbn=DB_NAME, silent=True):
     isgood = True
     try:
         db = pymysql.connect(dbw,dbu,dbp,dbn)
     except pymysql.MySQLError as e:
-        print('Got error {!r}, errno is {}'.format(e, e.args[0]))
+        if not silent:
+            print('Got error {!r}, errno is {}'.format(e, e.args[0]))
         #print('Error Code:', err.errno)
         #print('SQLSTATE:', err.sqlstate)
         #print('Message:', err.msg)
+            print('Credentials:',dbu, '@',dbw, 'db name:', dbn)
         isgood = False
 
     try:
         db.close()
     except:
         pass
-    return isgoods
+    return isgood
 
 def dbCursor():
     print('dbCursor')
@@ -120,91 +121,122 @@ def writable( fp ): # Is ther a better way to test?
 def inputConfig(fd=False,fp=False,dbn=False,
     dbu=False,dbp=False,cam=False,dbh=False):
 # the recieved parameters determine if we need to config specified value(s)
+# tmp var will hold entered values until verified, then stored
+
+# Need to break out the code for testing user supplied parameters
 
     global IMAGE_FP, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND
-    global DB_WHERE
+    global DB_HOST
 
     print('Using config file ', CONFIG_FILE)
     dict = {}
-    while( not fd ):
-        msg = 'Image directory:[' + IMAGE_FP + ']'
-        x = input(msg)
-        if( x != ''):
-            IMAGE_FP = expanduser(x)
-        if( checkDir(IMAGE_FP, False, "Image ")):
-            if( not writable(IMAGE_FP)):
-                print('Cannot write files to directory->', IMAGE_FP)
+    done = False
+    write_db_cfg = False
+
+    while( not done):
+        while( not fd ):
+            msg = 'Image directory:[' + IMAGE_FP + ']'
+            tmp_fp = input(msg)
+            if( tmp_fp != ''):
+                tmp_fp = expanduser(tmp_fp)
             else:
-                dict['fn_path']= IMAGE_FP
-                fd = True
-
-    while( not fp ):
-        msg = 'Image file prefix:[' + IMAGE_PREFIX + ']'
-        x = input(msg )
-        if( x != ''): #Do more checking for legit filename
-            IMAGE_PREFIX = x
-        dict['fn_prefix'] = IMAGE_PREFIX
-        fp = True
-
-    while( not dbn ): #Get a list of available DBs?
-        msg = 'Database name:[' + DB_NAME + ']'
-        x = input(msg)
-        if( x != ''): #Do more checking for legit dbname
-            DB_NAME = x
-        if( DB_NAME == ''):
-            print('Database name cannot be blank')
-        else:
-            dict['db_name'] = DB_NAME
-            dbn = True
-
-    while( not dbu ):
-        msg = 'Database username:['+ DB_USER +']'
-        x = input(msg)
-        if( x != ''):
-            DB_USER = x
-        if( DB_USER == ''):
-            print('Database username cannot be blank')
-        else:
-            dict['db_user'] = DB_USER
-            dbu = True
-
-    while( not dbp ): #Get a list of available DBs?
-        msg = 'Database passwd:[' + DB_PWD +']'
-        x = input(msg)
-        if( x != ''):
-            DB_PWD = x
-        if( DB_PWD == ''):
-            print('Database password cannot be blank')
-        else:
-            dict['db_pass'] = DB_PWD
-            dbp = True
-
-    while( not dbh ): #Get a list of available DBs?
-        msg = 'Hostname:[' + DB_WHERE +']'
-        x = input(msg)
-        if( x != ''):
-            DB_WHERE = x
-        if( DB_WHERE == ''):
-            print('Database hostname cannot be blank')
-        else:
-            dict['db_host'] = DB_WHERE
-            dbh = True
-
-    while( not cam ):
-        msg = 'Camera capture command:['+ CC_COMMAND + ']'
-        cc = input(msg)
-        if( cc != '' ):
-            if( cameraCmdCheck( cc, silent=False) ):
-                CC_COMMAND = cc
-                cam = False
-            else:
-                if( input('Cannot locate command. Retry?[y]') != 'y'):
-                    cam = True
+                tmp_fp = IMAGE_FP
+            if( checkDir(tmp_fp, False, "Image ")):
+                if( not writable(tmp_fp)):
+                    print('Cannot write files to directory->', tmp_fp)
                 else:
-                    cam = False
+                    IMAGE_FP = tmp_fp
+                    dict['fn_path']= IMAGE_FP
+                    fd = True
+
+        while( not fp ):
+            msg = 'Image file prefix:[' + IMAGE_PREFIX + ']'
+            x = input(msg )
+            if( x != ''): #Do more checking for legit filename
+                IMAGE_PREFIX = x
+            dict['fn_prefix'] = IMAGE_PREFIX
+            fp = True
+
+        while( not dbn ): #Get a list of available DBs?
+            msg = 'Database name:[' + DB_NAME + ']'
+            tmp_dbn = input(msg)
+            if tmp_dbn == '': #Do more checking for legit dbname
+                tmp_dbn = DB_NAME
+            if tmp_dbn == '':
+                print('Database name cannot be blank')
+            else:
+                dbn = True
+
+        while( not dbu ):
+            msg = 'Database username:['+ DB_USER +']'
+            tmp_dbu = input(msg)
+            if( tmp_dbu == ''):
+                tmp_dbu = DB_USER
+            if( tmp_dbu == ''):
+                print('Database username cannot be blank')
+            else:
+                dbu = True
+
+        while( not dbp ): #Get a list of available DBs?
+            msg = 'Database passwd:[' + DB_PWD +']'
+            tmp_pwd = input(msg)
+            if( tmp_pwd == ''):
+                tmp_pwd = DB_PWD
+            if( tmp_pwd == ''):
+                print('Database password cannot be blank')
+            else:
+                dbp = True
+
+        while( not dbh ): #Get a list of available DBs?
+            msg = 'Hostname:[' + DB_HOST +']'
+            tmp_dbw = input(msg)
+            if( tmp_dbw == ''):
+                tmp_dbw = DB_HOST
+            if( tmp_dbw == ''):
+                print('Database hostname cannot be blank')
+            else:
+                dbh = True
+
+        print('Testing database access...')
+        if( not dbAvailable() ):
+            print('Cannot access db with supplied parameters')
+            ans_done = False
+            while ( not ans_done):
+                ans = input('(r)etry, (s)kip or ignore & (w)rite ')
+                if ans == 's':
+                    ans_done = True
+                elif ans == 'w':
+                    ans_done = True
+                    write_db_cfg = True
+                else:
+                    continue
         else:
-            cam = True
-    dict['camera'] = CC_COMMAND
+            write_db_cfg = True
+        if write_db_cfg:
+            DB_HOST = tmp_dbw
+            DB_PWD   = tmp_pwd
+            DB_USER  = tmp_dbu
+            DB_NAME  = tmp_dbn
+            dict['db_host'] = DB_HOST
+            dict['db_pass'] = DB_PWD
+            dict['db_user'] = DB_USER
+            dict['db_name'] = DB_NAME
+
+        while( not cam ):
+            msg = 'Camera capture command:['+ CC_COMMAND + ']'
+            cc = input(msg)
+            if( cc == '' ):
+                cc = CC_COMMAND
+            if cameraCmdCheck( cc, silent=False):
+                CC_COMMAND = cc
+                cam = True
+            else:
+                if input('Cannot locate command. Retry?[y]') != 'y':
+                    print('Bad camera command')
+                    cam = True
+        dict['camera'] = CC_COMMAND
+        done = fd and fp and dbn and dbu and dbp and cam and dbh
+
 
     parser = configparser.ConfigParser()
     if( not parser.has_section(CONFIG_SECTION_NAME) ):
@@ -226,7 +258,9 @@ def inputConfig(fd=False,fp=False,dbn=False,
 
 def loadConfig( show=True ):
     global IMAGE_FP, IMAGE_PREFIX, DB_PWD, DB_NAME
-    global DB_USER, CC_COMMAND
+    global DB_USER, CC_COMMAND,DB_HOST
+
+    parser = parser = configparser.ConfigParser()
     parser.read(CONFIG_FILE)
     for sect in parser.sections():
        if( show ):
@@ -234,18 +268,20 @@ def loadConfig( show=True ):
        for k,v in parser.items(sect):
           if( show ):
               print(' {} = {}'.format(k,v))
-          if( k == 'fn_path') :  IMAGE_FP = expanduser(v)
-          if( k == 'fn_prefix'): IMAGE_PREFIX = v
-          if( k == 'db_name'):   DB_NAME = v
-          if( k == 'db_user'):   DB_USER = v
-          if( k == 'db_pass'):   DB_PWD = v
-          if( k == 'camera'):    CC_COMMAND = v
+          if k == 'fn_path'    : IMAGE_FP = expanduser(v)
+          elif k == 'fn_prefix': IMAGE_PREFIX = v
+          elif k == 'db_name'  : DB_NAME = v
+          elif k == 'db_user'  : DB_USER = v
+          elif k == 'db_pass'  : DB_PWD = v
+          elif k == 'camera'   : CC_COMMAND = v
+          elif k == 'db_host'  : DB_HOST = v
        if( show ):
            print()
 ###
 def checkConfig(silent=False):
 # Coded this function to use possible future robust validity checks
-#
+# Database check happens elswhere
+
     if( not silent ): print('checking config file')
     dict = { 'isgood' : True }
     if( not checkDir(IMAGE_FP, False, "Image " )):
@@ -258,34 +294,24 @@ def checkConfig(silent=False):
         dict['fp'] = True
         dict['isgood'] = False
 
-    if( DB_PWD == ''):
-        print('Problem with database password(is blank)')
-        dict['dbp'] = True
-        dict['isgood'] = False
-
-    if( DB_USER == ''):
-        print('Problem with database username(is blank)')
-        dict['dbu'] = True
-        dict['isgood'] = False
-
-    if( DB_NAME == ''):
-        print('Problem with database name(is blank)')
-        dict['dbn'] = True
-        dict['isgood'] = False
-
-    if( DB_WHERE == ''):
-        print('Problem with database host(is blank)')
-        dict['db_host'] = True
-        dict['isgood'] = False
-
     if( not cameraCmdCheck( CC_COMMAND, True )):
         print('Problem with camera command')
         dict['cam'] = True
         dict['isgood'] = False
 
     if( dict['isgood'] ): print(' config OK')
+
     return dict
 ### end checkConfig
+
+def showConfig( dict[] ):
+    print('Image file directory:', dict['fn_path'])
+    print('Image file prefix   :', dict['fn_prefix'])
+    print('Database username   :', dict['db_user'] )
+    print('Database name       :', dict['db_name'])
+    print('Database hostname   :', dict['db_host'])
+    print('Database password not shown')
+    print('Camera capture cmd  :', dict['camera'])
 
 #================= End config stuff ======================
 
@@ -331,15 +357,26 @@ def main(argv):
      if( not chk_config['isgood']):
          del chk_config['isgood']
          done = False
-         print('Problem with config. Would you like to enter new config param?')
+         print('Problem with config. Would you like to enter new config param?[y]')
          while( not done ):
-             if( input('[y]') == 'y'):
+             if( input('') == 'y'):
                  if( inputConfig( **chk_config ) ):
                      done = True
                  else:
                      print('Try again?', end='')
              else:
+                 exit()
                  done =True
+     done = False
+     msg = 'Config options: (s)how, (e)dit or e(x)it?'
+     while not done:
+         ans = input(msg)
+         if ans == 's': showConfig()
+         elif ans == 'e': inputConfig()
+         elif ans == 'x': done = True
+
+     if not dbAvailable():
+         print('dbproblem')
 # Phew! config stuff done!
 
 ################################
