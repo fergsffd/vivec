@@ -304,14 +304,14 @@ def checkConfig(silent=False):
     return dict
 ### end checkConfig
 
-def showConfig( dict[] ):
-    print('Image file directory:', dict['fn_path'])
-    print('Image file prefix   :', dict['fn_prefix'])
-    print('Database username   :', dict['db_user'] )
-    print('Database name       :', dict['db_name'])
-    print('Database hostname   :', dict['db_host'])
+def showConfig(  ):
+    print('Image file directory:', IMAGE_FP)
+    print('Image file prefix   :', IMAGE_PREFIX)
+    print('Database username   :', DB_USER )
+    print('Database name       :', DB_NAME)
+    print('Database hostname   :', DB_HOST)
     print('Database password not shown')
-    print('Camera capture cmd  :', dict['camera'])
+    print('Camera capture cmd  :', CC_COMMAND)
 
 #================= End config stuff ======================
 
@@ -354,19 +354,14 @@ def main(argv):
              print('Cannot proceed without config file -- exiting')
              exit()
      chk_config = checkConfig()
+     if not dbAvailable():
+         print('dbproblem')
      if( not chk_config['isgood']):
          del chk_config['isgood']
-         done = False
+
          print('Problem with config. Would you like to enter new config param?[y]')
-         while( not done ):
-             if( input('') == 'y'):
-                 if( inputConfig( **chk_config ) ):
-                     done = True
-                 else:
-                     print('Try again?', end='')
-             else:
-                 exit()
-                 done =True
+         if input('') == 'y':
+            inputConfig( **chk_config )
      done = False
      msg = 'Config options: (s)how, (e)dit or e(x)it?'
      while not done:
@@ -375,8 +370,7 @@ def main(argv):
          elif ans == 'e': inputConfig()
          elif ans == 'x': done = True
 
-     if not dbAvailable():
-         print('dbproblem')
+
 # Phew! config stuff done!
 
 ################################
