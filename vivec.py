@@ -22,7 +22,9 @@ import configparser
 
 ## Default globals. Assigned in the loadConfig and setConfig functions, nowhere else
 TEST = False  # Not checking hardware or writing to db
-CONFIG_FILE = os.getcwd() + '/.vconfig'
+CONFIG_DIR = os.getcwd()
+CONFIG_FN = '.vconfig'
+CONFIG_FILE = CONFIG_DIR + CONFIG_FN
 IMAGE_DIR = os.getcwd() + "/images/"
 IMAGE_PREFIX = "image"
 CC_COMMAND = "/usr/bin/raspistill -vf -hf -t 10 -o "  # Camera Capture
@@ -36,23 +38,18 @@ CONFIG_SECTION_NAME = 'SETTINGS'
 # ============ Database code ===========================
 # Test DB access. Can I return itemized DB access failures?
 def dbAvailable(dbw=DB_HOST, dbu=DB_USER, dbp=DB_PWD, dbn=DB_NAME):
-    # global DB_USER,DB_PWD,DB_HOST,DB_NAME, TEST
-
     silent = not TEST
-    print('dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
-    print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
+    print('  -dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
+    print('   globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
     try:
-        db = pymysql.connect(host=dbw,
-                             user=dbu,
-                             password='9612729issiS#',
-                             db=dbn)
+        db = pymysql.connect(host=dbw, user=dbu, password=dbp, db=dbn)
     except pymysql.MySQLError as e:
         if not silent:
             print('Got error {!r}, errno is {}'.format(e, e.args[0]))
             # print('Error Code:', err.errno)
             # print('SQLSTATE:', err.sqlmysqlstate)
             # print('Message:', err.msg)
-            print('Credentials:', dbu, '@', dbw, 'db name:', dbn)
+            print('Credentials:', dbu, '@', dbw, ' connecting to:', dbn)
         isgood = False
 
     try:
@@ -68,7 +65,7 @@ def dbCursor():
 
 
 # Setup DB if not exist
-def dbConfig(testing=False):
+def dbConfig():
     print('dbConfig')
     return True
 
@@ -104,20 +101,16 @@ def setConfig(fn_path, fn_prefix, db_name, db_user, db_pass, db_host, camera):
     DB_PWD = db_pass
     CC_COMMAND = camera
     DB_HOST = db_host
-    """for k in dict:
-        if k == 'fn_path'    : IMAGE_DIR    = dict['fn_path']
-        elif k == 'fn_prefix': IMAGE_PREFIX = dict['fn_prefix']
-        elif k == 'db_name'  : DB_NAME      = dict['db_name']
-        elif k == 'db_user'  : DB_USER      = dict['db_user']
-        elif k == 'db_pass'  : DB_PWD       = dict['db_pass']
-        elif k == 'camera'   : CC_COMMAND   = dict['camera']
-        elif k == 'db_host'  : DB_HOST      = dict['db_host']"""
+
+    if TEST:
+        print('Config vars set')
 
 
-def cameraCmdCheck(cc, silent=False):
+def cameraCmdCheck(cc):
     # Check if camera command is valid. Does not check options
-    if not silent:
-        print('Checking:', cc)
+    if TEST:
+        print('Checking camera command:', cc)
+    i = 0
     for i in range(0, len(cc)):
         if cc[i] == ' ':
             break
@@ -125,19 +118,19 @@ def cameraCmdCheck(cc, silent=False):
     cam = cc[:i]
 
     if not isfile(cam):
-        if not silent: print('Command >', cam, '< does not exist.')
+        if TEST: print('Command >', cam, '< does not exist.')
         return False
     if not os.access(cam, os.X_OK):
-        if not silent: print('Command >', cam, '<is not executable')
+        if TEST: print('Command >', cam, '<is not executable')
         return False
     return True  # No arguments for capture command?
 
 
 ###########
-def checkDir(fd, silent=True, msg=''):
+def checkDir(fd,  msg=''):
     if not os.path.exists(fd):
         msg = msg + 'directory [' + fd + '] does not exist. '
-        if not silent:
+        if TEST:
             print(msg)
             ans = input('Attempt to create?[y/n]')
         else:
@@ -196,7 +189,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                 tmp_fd = expanduser(tmp_fd)
             else:
                 tmp_fd = IMAGE_DIR
-            if checkDir(tmp_fd, False, "Image "):
+            if checkDir(tmp_fd,  "Image "):
                 if not writable(tmp_fd):
                     print('Cannot write files to directory->', tmp_fd)
                 else:
@@ -272,7 +265,8 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
         print('Testing database access...')
         print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
         print()
-        if not dbAvailable():
+        if not dbAvailable(dbu=conf_val['db_user'], dbp=conf_val['db_pass'], dbn=conf_val['db_name'],
+                           dbw=conf_val['db_host']):
             print('Cannot access db with supplied parameters')
             db_good = False
         else:
@@ -284,7 +278,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
             tmp_cc = input(msg)
             if tmp_cc == '':
                 tmp_cc = CC_COMMAND
-            if cameraCmdCheck(tmp_cc, silent=False):
+            if cameraCmdCheck(tmp_cc):
                 cam_done = True
                 conf_val['camera'] = tmp_cc
             else:
@@ -341,7 +335,7 @@ def loadConfig():
     global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME
     global DB_USER, CC_COMMAND, DB_HOST
 
-    parser = parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser()
     parser.read(CONFIG_FILE)
     for sect in parser.sections():
         if TEST:
@@ -377,7 +371,7 @@ def checkConfig(fd=IMAGE_DIR, fp=IMAGE_PREFIX, cam=CC_COMMAND):
     silent = not TEST
     if silent: print('checking config file')
     dict = {'isgood': True}
-    if not checkDir(fd, False, "Image "):
+    if not checkDir(fd, "Image "):
         print('Problem with image directory.')
         dict['fd'] = True
         dict['isgood'] = False
@@ -391,16 +385,17 @@ def checkConfig(fd=IMAGE_DIR, fp=IMAGE_PREFIX, cam=CC_COMMAND):
     else:
         dict['fp'] = False
 
-    if not cameraCmdCheck(cam, True):
+    if not cameraCmdCheck(cam):
         print('Problem with camera command')
         dict['cam'] = True
         dict['isgood'] = False
     else:
         dict['cam'] = False
 
-    print('checkConfig')
-    print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
-    print()
+    if TEST:
+        print('checkConfig')
+        print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
+        print()
     if not dbAvailable():
         print('Problem with database access')
         dict['dbn'] = True
@@ -442,8 +437,7 @@ def printUsage():
 
 ###########################
 def main(argv):
-    global CONFIG_FILE, TEST  # , DB_USER, DB_PWD, DB_HOST, DB_NAME
-    # global IMAGE_DIR, IMAGE_PREFIX, CC_COMMAND
+    global CONFIG_DIR, CONFIG_FN, CONFIG_FILE, TEST
 
     try:
         opts, args = getopt.getopt(argv, "htc:", ['help', 'test', "config="])
@@ -470,16 +464,18 @@ def main(argv):
         x = input('Create config file?[y]')
         if x == 'y':
             dir_done = False
+            tmp_cnf = ''
             while not dir_done:
                 msg = 'Path for config file?[', os.getcwd(), ' ]?'
                 ans: str = input(msg)
                 if ans == '':
-                    tmp_cnf = os.getcwd() + "/.vconfig"
-                tmp_cnf = expanduser(tmp_cnf) + '/.vconfig'
-                if not checkDir(tmp_cnf):
-                    print('Cannot create config file', tmp_cnf)
+                    tmp_cnf = CONFIG_DIR
                 else:
-                    CONFIG_FILE = tmp_cnf
+                    tmp_cnf = expanduser(tmp_cnf)
+                if not checkDir(tmp_cnf):
+                    print('Cannot create config file directory', tmp_cnf)
+                else:
+                    CONFIG_FILE = tmp_cnf + CONFIG_FN
                     dir_done = True
 
             if not inputConfig():
