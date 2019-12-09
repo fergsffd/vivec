@@ -1,6 +1,8 @@
 """ Python3 """
 
 #
+from typing import Dict
+
 try:
     import RPi.GPIO as GPIO
 except:
@@ -28,23 +30,25 @@ CONFIG_FILE = CONFIG_DIR + CONFIG_FN
 IMAGE_DIR = os.getcwd() + "/images/"
 IMAGE_PREFIX = "image"
 CC_COMMAND = "/usr/bin/raspistill -vf -hf -t 10 -o "  # Camera Capture
-DB_USER = ""
+DB_USER: str = "none"
 DB_NAME = "vivecdb"
-DB_PWD = ""
+DB_PWD = "password"
 DB_HOST = 'LOCALHOST'
 CONFIG_SECTION_NAME = 'SETTINGS'
 
 
 # ============ Database code ===========================
 # Test DB access. Can I return itemized DB access failures?
-def dbAvailable(dbw=DB_HOST, dbu=DB_USER, dbp=DB_PWD, dbn=DB_NAME):
-    silent = not TEST
-    print('  -dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
-    print('   globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
+def dbAvailable(dbw, dbu, dbp, dbn):
+
+    isgood = True
+    if TEST:
+        print('  -dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
+        print('   globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
     try:
         db = pymysql.connect(host=dbw, user=dbu, password=dbp, db=dbn)
     except pymysql.MySQLError as e:
-        if not silent:
+        if TEST:
             print('Got error {!r}, errno is {}'.format(e, e.args[0]))
             # print('Error Code:', err.errno)
             # print('SQLSTATE:', err.sqlmysqlstate)
@@ -91,8 +95,8 @@ def inv(msg):
 
 # Set working config parameters
 def setConfig(fn_path, fn_prefix, db_name, db_user, db_pass, db_host, camera):
-    global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND
-    global DB_HOST
+
+    global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND, DB_HOST
 
     IMAGE_DIR = fn_path
     IMAGE_PREFIX = fn_prefix
@@ -115,7 +119,7 @@ def cameraCmdCheck(cc):
         if cc[i] == ' ':
             break
 
-    cam = cc[:i]
+    cam = cc[:(i+1)]
 
     if not isfile(cam):
         if TEST: print('Command >', cam, '< does not exist.')
@@ -263,8 +267,10 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                 conf_val['db_host'] = tmp_dbw
 
         print('Testing database access...')
-        print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
-        print()
+        if TEST:
+            print('inputConfig')
+            print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
+            print()
         if not dbAvailable(dbu=conf_val['db_user'], dbp=conf_val['db_pass'], dbn=conf_val['db_name'],
                            dbw=conf_val['db_host']):
             print('Cannot access db with supplied parameters')
@@ -357,35 +363,34 @@ def loadConfig():
                 CC_COMMAND = v
             elif k == 'db_host':
                 DB_HOST = v
-        if TEST:
-            print('db_pass:', DB_PWD)
-        # setConfig()
 
+##################################################
 
-###
-def checkConfig(fd=IMAGE_DIR, fp=IMAGE_PREFIX, cam=CC_COMMAND):
+def checkConfig():
     # Coded this function to use possible future robust validity checks
 
     # Returns a list of valid(False) and invalid(True) config entries
 
-    silent = not TEST
-    if silent: print('checking config file')
-    dict = {'isgood': True}
-    if not checkDir(fd, "Image "):
+    dict: Dict[str, bool] = {'isgood': True}
+
+    if TEST:
+        print('checking config file')
+
+    if not checkDir(IMAGE_DIR, "Image "):
         print('Problem with image directory.')
         dict['fd'] = True
         dict['isgood'] = False
     else:
         dict['fd'] = True
 
-    if fp == '':
+    if IMAGE_PREFIX == '':
         print('Probem with image file prefix(is blank)')
         dict['fp'] = True
         dict['isgood'] = False
     else:
         dict['fp'] = False
 
-    if not cameraCmdCheck(cam):
+    if not cameraCmdCheck(CC_COMMAND):
         print('Problem with camera command')
         dict['cam'] = True
         dict['isgood'] = False
@@ -396,7 +401,7 @@ def checkConfig(fd=IMAGE_DIR, fp=IMAGE_PREFIX, cam=CC_COMMAND):
         print('checkConfig')
         print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
         print()
-    if not dbAvailable():
+    if not dbAvailable( dbn=DB_NAME,dbu=DB_USER,dbp=DB_PWD,dbw=DB_HOST):
         print('Problem with database access')
         dict['dbn'] = True
         dict['dbu'] = True
@@ -409,7 +414,7 @@ def checkConfig(fd=IMAGE_DIR, fp=IMAGE_PREFIX, cam=CC_COMMAND):
         dict['dbp'] = False
         dict['dbh'] = False
 
-    if dict['isgood'] and not silent: print(' config OK')
+    if dict['isgood'] and TEST: print(' config OK')
 
     return dict
 
