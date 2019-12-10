@@ -40,7 +40,6 @@ CONFIG_SECTION_NAME = 'SETTINGS'
 # ============ Database code ===========================
 # Test DB access. Can I return itemized DB access failures?
 def dbAvailable(dbw, dbu, dbp, dbn):
-
     isgood = True
     if TEST:
         print('  -dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
@@ -95,7 +94,6 @@ def inv(msg):
 
 # Set working config parameters
 def setConfig(fn_path, fn_prefix, db_name, db_user, db_pass, db_host, camera):
-
     global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME, DB_USER, CC_COMMAND, DB_HOST
 
     IMAGE_DIR = fn_path
@@ -119,7 +117,7 @@ def cameraCmdCheck(cc):
         if cc[i] == ' ':
             break
 
-    cam = cc[:(i+1)]
+    cam = cc[:(i + 1)]
 
     if not isfile(cam):
         if TEST: print('Command >', cam, '< does not exist.')
@@ -131,7 +129,7 @@ def cameraCmdCheck(cc):
 
 
 ###########
-def checkDir(fd,  msg=''):
+def checkDir(fd, msg=''):
     if not os.path.exists(fd):
         msg = msg + 'directory [' + fd + '] does not exist. '
         if TEST:
@@ -193,7 +191,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                 tmp_fd = expanduser(tmp_fd)
             else:
                 tmp_fd = IMAGE_DIR
-            if checkDir(tmp_fd,  "Image "):
+            if checkDir(tmp_fd, "Image "):
                 if not writable(tmp_fd):
                     print('Cannot write files to directory->', tmp_fd)
                 else:
@@ -364,6 +362,7 @@ def loadConfig():
             elif k == 'db_host':
                 DB_HOST = v
 
+
 ##################################################
 
 def checkConfig():
@@ -401,7 +400,7 @@ def checkConfig():
         print('checkConfig')
         print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
         print()
-    if not dbAvailable( dbn=DB_NAME,dbu=DB_USER,dbp=DB_PWD,dbw=DB_HOST):
+    if not dbAvailable(dbn=DB_NAME, dbu=DB_USER, dbp=DB_PWD, dbw=DB_HOST):
         print('Problem with database access')
         dict['dbn'] = True
         dict['dbu'] = True
@@ -492,10 +491,10 @@ def main(argv):
     loadConfig()
     chk_config = checkConfig()
     if not chk_config['isgood']:
-        del chk_config['isgood']
         print('Problem with config. Would you like to enter new config params?', end='')
         if input('') == 'y':
             inputConfig(**chk_config)
+    del chk_config['isgood']
     done = False
     msg = 'Config options: (s)how, (e)dit or e(x)it?'
     while not done:
@@ -503,9 +502,8 @@ def main(argv):
         if ans == 's':
             showConfig()
         elif ans == 'e':
-            chk_config = checkConfig()
-            if not chk_config['isgood']:
-                del chk_config['isgood']
+            chk_config = checkConfig() # ugh! Fix this
+            del chk_config['isgood']
             inputConfig(**chk_config)
         elif ans == 'x':
             done = True
