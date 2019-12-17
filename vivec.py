@@ -14,11 +14,12 @@ else:
     HW_MODULE_PRESENT = True
 
 import os, sys, getopt, datetime
+import subprocess
 from os.path import isfile, expanduser
 import pymysql
 import configparser
 
-## Default globals. Assigned in the loadConfig and setConfig functions, nowhere else
+# Default globals. Assigned in the loadConfig and setConfig functions, nowhere else
 DEBUG = False
 CONFIG_DIR = expanduser('~/vivec')
 CONFIG_FN = '/.vconfig'
@@ -44,30 +45,51 @@ DB_COL_INV = 'InInventory'
 DB_COL_OBJ_NAME = 'ShoeName'
 
 ###############################
-def doMainMenu():
+def domainmenu():
+    done = False
     ans: str = ""
-    print('Main Menu')
-    print('===========')
-    print('1 -- Object capture')
-    print('2 -- List objects')
-    print('3 -- Configuration menu')
-    print('x -- exit')
-    ans = input('==>')
-    return ans
+    ans_list = [ '1','2','3','x']
+    while not done:
+        print('Main Menu')
+        print('===========')
+        print('1 -- Object capture')
+        print('2 -- List objects')
+        print('3 -- Configuration menu')
+        print('x -- exit')
+        ans = input('==>')
+        if ans not in ans_list:
+            print('Not a valid choice.\n')
+        else:
+            return ans
 #######
-def objCapture():
-    if DEBUG: print('Entered objCapture')
-    print('objCapture')
-    new_fn = get_new_fn()
-    print(new_fn)
-    if DEBUG: print('leaving objCapture')
+
+def obj_capture():
+
+    done = False
+    while not done:
+        ans = input('press enter key to initiate capture or press button(unavailable) or e(x)it')
+        if ans == 'x':
+            break
+        now = datetime.datetime.now()
+        fn = IMAGE_PREFIX + now.strftime('%y%m%d%H%M%S') + '.jpg'
+        run_cmd = CC_COMMAND + ' ' + IMAGE_DIR + fn
+        cmd_returned = subprocess.call(run_cmd, shell=True)
+        print('command', run_cmd, ' returned:',cmd_returned)
+        ans = input('Another capture? [y]')
+        if ans != 'y' and ans != '':
+            break
+
 #######
-def listObj():
-    if DEBUG: print('Entered listObj')
+def list_obj():
+    if DEBUG:
+        print('Entered listObj')
     print('listObj')
-    if DEBUG: print('leaving listObj')
+    if DEBUG:
+        print('leaving listObj')
 ########
-def do_main_menu():
+
+def config_menu():
+
     done = False
     msg = 'Config options: (s)how, (e)dit or e(x)it?'
     while not done:
@@ -133,21 +155,6 @@ def inv(msg):
 def debugg(msg): # Quick function for my debug messages
     if DEBUG:print(msg)
 
-def get_new_fn():
-# Return a new filename for image. Currently returning only doing numbers.
-# Does filename have to be in order? Let's try using dateime for fn suffix. Will that cause an 'orphan' file issue?
-# TODO If doing a multiframe capture (GIF), change filenaming?
-    filelist = os.listdir(IMAGE_DIR)
-    matching = [ s for s in filelist if IMAGE_PREFIX in s]
-    print('matching: ', matching)
-    matching.sort()
-    print('sorted', matching)
-    now = datetime.datetime.now()
-    print('time string: ', end = '')
-    print(now.strftime('%y%m%d%H%M%s'))
-    return 'testing'
-
-
 # ================= Config file stuff ====================
 
 # Set working config parameters
@@ -184,8 +191,8 @@ def cameraCmdCheck(cc):
     return True  # TODO  No arguments for capture command?
 
 
-###########
 def checkdir(fd, msg=''):
+
     if not os.path.exists(fd):
         msg = msg + 'directory [' + fd + '] does not exist. '
         print(msg)
@@ -250,7 +257,8 @@ def inputconfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
 
         while not fp_done:
             msg = 'Image filename prefix:[' + IMAGE_PREFIX + ']'
-            if not fp: msg = inv(msg)
+            if not fp:
+                msg = inv(msg)
             tmp_fp = input(msg)
             if tmp_fp == '':  # Do more checking for legit filename
                 tmp_fp = IMAGE_PREFIX
@@ -380,9 +388,8 @@ def inputconfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
         file.close()
         print('Changes saved')
         return True
-    if DEBUG: print('leaving inputConfig')
 
-## end inputConfig
+# end inputConfig
 
 def loadConfig():
     global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME
@@ -458,9 +465,6 @@ def checkConfig():
         dict['dbp'] = False
         dict['dbh'] = False
 
-    if dict['isgood'] and DEBUG: print(' config OK')
-    if DEBUG: print('Exiting checkConfig')
-
     return dict
 
 
@@ -489,7 +493,6 @@ def printUsage():
 def main(argv):
     global CONFIG_DIR, CONFIG_FN, CONFIG_FILE, DEBUG
 
-    if DEBUG: print('Entered main')
     try:
         opts, args = getopt.getopt(argv, "htc:", ['help', 'test', "config="])
     except getopt.GetoptError:
@@ -544,20 +547,18 @@ def main(argv):
     del chk_config['isgood']
     # Initial config check done
     done = False
-    menu =  ""
+    menu = ""
     while not done: # Main Menu
-        menu = doMainMenu()
+        menu = domainmenu()
         if menu == '1':
-            objCapture()
+            obj_capture()
         elif menu == '2':
-            listObj()
+            list_obj()
         elif menu == '3':
-            do_main_menu()
+            config_menu()
         elif menu == 'x':
             done = True
-        else:
-            print('Invalid choice')
-        if DEBUG: print('leaving main')
+
 ################################
 
 ###### Main ######
