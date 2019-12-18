@@ -1,6 +1,5 @@
 """ Python3 """
 
-#
 from typing import Dict
 
 try:
@@ -14,53 +13,116 @@ else:
     GPIO.add_event_detect(pinNum, GPIO.RISING, bouncetime=200)
     HW_MODULE_PRESENT = True
 
-import time
-from datetime import datetime
-import os, sys, getopt
-from os import listdir, system, mknod
-from os.path import isfile, join, expanduser
+import os, sys, getopt, datetime
+import subprocess
+from os.path import isfile, expanduser
 import pymysql
 import configparser
 
-## Default globals. Assigned in the loadConfig and setConfig functions, nowhere else
-TEST = False  # Not checking hardware or writing to db
-CONFIG_DIR = os.getcwd()
-CONFIG_FN = '.vconfig'
+# Default globals. Assigned in the loadConfig and setConfig functions, nowhere else
+DEBUG = False
+CONFIG_DIR = expanduser('~/vivec')
+CONFIG_FN = '/.vconfig'
 CONFIG_FILE = CONFIG_DIR + CONFIG_FN
-IMAGE_DIR = os.getcwd() + "/images/"
+IMAGE_DIR = CONFIG_DIR + "/images/"
 IMAGE_PREFIX = "image"
 CC_COMMAND = "/usr/bin/raspistill -vf -hf -t 10 -o "  # Camera Capture
 DB_USER: str = "none"
 DB_NAME = "vivecdb"
 DB_PWD = "password"
 DB_HOST = 'LOCALHOST'
+
 CONFIG_SECTION_NAME = 'SETTINGS'
 
+########### DB hard coded values ###########
 
+DB_TABLE = 'Shoes_DB'
+DB_KEY = 'idShoes_table'
+DB_COL_FN = 'ImageFilename'
+DB_COL_DateAdded = 'DateAdded'
+DB_COL_PURCH =  'PurchasePrice'
+DB_COL_INV = 'InInventory'
+DB_COL_OBJ_NAME = 'ShoeName'
+
+###############################
+def domainmenu():
+    done = False
+    ans: str = ""
+    ans_list = [ '1','2','3','x']
+    while not done:
+        print('Main Menu')
+        print('===========')
+        print('1 -- Object capture')
+        print('2 -- List objects')
+        print('3 -- Configuration menu')
+        print('x -- exit')
+        ans = input('==>')
+        if ans not in ans_list:
+            print('Not a valid choice.\n')
+        else:
+            return ans
+#######
+
+def obj_capture():
+
+    done = False
+    while not done:
+        ans = input('press enter key to initiate capture or press button(unavailable) or e(x)it')
+        if ans == 'x':
+            break
+        now = datetime.datetime.now()
+        fn = IMAGE_PREFIX + now.strftime('%y%m%d%H%M%S') + '.jpg'
+        run_cmd = CC_COMMAND + ' ' + IMAGE_DIR + fn
+        cmd_returned = subprocess.call(run_cmd, shell=True)
+        print('command', run_cmd, ' returned:',cmd_returned)
+        ans = input('Another capture? [y]')
+        if ans != 'y' and ans != '':
+            break
+
+#######
+def list_obj():
+    if DEBUG:
+        print('Entered listObj')
+    print('listObj')
+    if DEBUG:
+        print('leaving listObj')
+########
+
+def config_menu():
+
+    done = False
+    msg = 'Config options: (s)how, (e)dit or e(x)it?'
+    while not done:
+        ans = input(msg)
+        if ans == 's':
+            showConfig()
+        elif ans == 'e':
+            chk_config = checkConfig()  # ugh! Fix this
+            del chk_config['isgood']
+            inputconfig(**chk_config)
+        elif ans == 'x':
+            done = True
 # ============ Database code ===========================
-# Test DB access. Can I return itemized DB access failures?
+# Test DB access.
+# TODO Can I return itemized DB access failures?
+# TODO How to determine if db structure matches what we have configured. This is a heavy lift....
+
 def dbAvailable(dbw, dbu, dbp, dbn):
     isgood = True
-    if TEST:
-        print('  -dbAvailable dbu,dbp,dbw,dbn:', dbu, dbp, dbw, dbn)
-        print('   globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
+
     try:
         db = pymysql.connect(host=dbw, user=dbu, password=dbp, db=dbn)
     except pymysql.MySQLError as e:
-        if TEST:
-            print('Got error {!r}, errno is {}'.format(e, e.args[0]))
-            # print('Error Code:', err.errno)
-            # print('SQLSTATE:', err.sqlmysqlstate)
-            # print('Message:', err.msg)
-            print('Credentials:', dbu, '@', dbw, ' connecting to:', dbn)
+
         isgood = False
+        if DEBUG: print('db access denied')
 
     try:
         db.close()
     except:
         pass
-    return isgood
 
+    return isgood
 
 def dbCursor():
     print('dbCursor')
@@ -73,22 +135,25 @@ def dbConfig():
     return True
 
 
-def dbInsert(cur):
+def dbInsert():
     print('dbInsert')
     return True
 
 
-def dbQuery(cur):
+def dbQuery():
     print('dbQuery')
+    
     return True
 
 
 # ================= End DB stuff =========================
 
 # The method might be expanded out to make more descriptive error messages
+# FIXME Is this useful? If so, fix
 def inv(msg):
     return ' >>' + msg
-
+def debugg(msg): # Quick function for my debug messages
+    if DEBUG:print(msg)
 
 # ================= Config file stuff ====================
 
@@ -104,14 +169,12 @@ def setConfig(fn_path, fn_prefix, db_name, db_user, db_pass, db_host, camera):
     CC_COMMAND = camera
     DB_HOST = db_host
 
-    if TEST:
-        print('Config vars set')
+    debugg('Config vars set')
 
-
+##############
 def cameraCmdCheck(cc):
     # Check if camera command is valid. Does not check options
-    if TEST:
-        print('Checking camera command:', cc)
+    #debugg('Checking camera command:', cc)
     i = 0
     for i in range(0, len(cc)):
         if cc[i] == ' ':
@@ -120,34 +183,31 @@ def cameraCmdCheck(cc):
     cam = cc[:(i + 1)]
 
     if not isfile(cam):
-        if TEST: print('Command >', cam, '< does not exist.')
+        #if DEBUG: print('Command >', cam, '< does not exist.')
         return False
     if not os.access(cam, os.X_OK):
-        if TEST: print('Command >', cam, '<is not executable')
+        #if DEBUG: print('Command >', cam, '<is not executable')
         return False
-    return True  # No arguments for capture command?
+    return True  # TODO  No arguments for capture command?
 
 
-###########
-def checkDir(fd, msg=''):
+def checkdir(fd, msg=''):
+
     if not os.path.exists(fd):
         msg = msg + 'directory [' + fd + '] does not exist. '
-        if TEST:
-            print(msg)
-            ans = input('Attempt to create?[y/n]')
-        else:
-            ans = 'y'
+        print(msg)
+        ans = input('Attempt to create?[y/n]')
         if ans == 'y':
             os.makedirs(fd)
-            done = True
+            return True
         if ans == 'n':
             return False
     return True
 
 
 #####
-def writable(fp):  # Is ther a better way to test?
-    checkDir(fp)
+def writable(fp):  # TODO Is there a better way to test?
+    checkdir(fp)
     fn = fp + '/test'
     try:
         test = os.open(fn, os.O_CREAT)
@@ -158,9 +218,8 @@ def writable(fp):  # Is ther a better way to test?
         os.remove(fn)
         return True
 
-
 ###
-def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, dbh=False):
+def inputconfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, dbh=False):
     # the recieved parameters determine if we need to config specified value(s)
     # tmp var will hold entered values until verified, then stored
 
@@ -168,10 +227,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
     # feedback ( bad credentail vs schema or table not found)
 
     # Need to break out the code for testing user supplied parameters
-
-    # global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME
-    # global DB_USER, CC_COMMAND,DB_HOST
-
+    if DEBUG: print('Entering inputConfig')
     conf_val = {}  # Store values for writing to file
     done = False
     fd_done = False
@@ -191,7 +247,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                 tmp_fd = expanduser(tmp_fd)
             else:
                 tmp_fd = IMAGE_DIR
-            if checkDir(tmp_fd, "Image "):
+            if checkdir(tmp_fd, "Image "):
                 if not writable(tmp_fd):
                     print('Cannot write files to directory->', tmp_fd)
                 else:
@@ -201,7 +257,8 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
 
         while not fp_done:
             msg = 'Image filename prefix:[' + IMAGE_PREFIX + ']'
-            if not fp: msg = inv(msg)
+            if not fp:
+                msg = inv(msg)
             tmp_fp = input(msg)
             if tmp_fp == '':  # Do more checking for legit filename
                 tmp_fp = IMAGE_PREFIX
@@ -264,16 +321,13 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                 dbh = True
                 conf_val['db_host'] = tmp_dbw
 
-        print('Testing database access...')
-        if TEST:
-            print('inputConfig')
-            print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
-            print()
+        print('Testing database access...') # FIXME Something is broken here. (d)iscard changes cause loop
         if not dbAvailable(dbu=conf_val['db_user'], dbp=conf_val['db_pass'], dbn=conf_val['db_name'],
                            dbw=conf_val['db_host']):
             print('Cannot access db with supplied parameters')
             db_good = False
         else:
+            print('Access granted')
             db_good = True
 
         while not cam_done:
@@ -301,16 +355,19 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
                     elif ans == 'r':
                         ans_done = True
 
-        done = fd and fp and dbn and dbu and dbp and cam and dbh and db_good
+        conf_done = fd and fp and dbn and dbu and dbp and cam and dbh and db_good
 
-        while not done:
+        while not conf_done:
             ans = input('Problem with configuration. (r)etry, (d)iscard changes or ignore & (w)rite ')
             if ans == 'd':
                 return False
             elif ans == 'w':
+                conf_done = True
                 done = True
+            elif ans == 'r':
+                conf_done = True
             else:
-                continue
+                print('Invalid choice')
 
     print('Variables to be written to config file:')
     setConfig(**conf_val)
@@ -332,8 +389,7 @@ def inputConfig(fd=False, fp=False, dbn=False, dbu=False, dbp=False, cam=False, 
         print('Changes saved')
         return True
 
-
-## end inputConfig
+# end inputConfig
 
 def loadConfig():
     global IMAGE_DIR, IMAGE_PREFIX, DB_PWD, DB_NAME
@@ -342,10 +398,10 @@ def loadConfig():
     parser = configparser.ConfigParser()
     parser.read(CONFIG_FILE)
     for sect in parser.sections():
-        if TEST:
+        if DEBUG:
             print('Section:', sect)
         for k, v in parser.items(sect):
-            if TEST:
+            if DEBUG:
                 print(' {} = {}'.format(k, v))
             if k == 'fn_path':
                 IMAGE_DIR = expanduser(v)
@@ -372,10 +428,10 @@ def checkConfig():
 
     dict: Dict[str, bool] = {'isgood': True}
 
-    if TEST:
-        print('checking config file')
+    if DEBUG:
+        print('Entered checkConfig')
 
-    if not checkDir(IMAGE_DIR, "Image "):
+    if not checkdir(IMAGE_DIR, "Image "):
         print('Problem with image directory.')
         dict['fd'] = True
         dict['isgood'] = False
@@ -396,10 +452,6 @@ def checkConfig():
     else:
         dict['cam'] = False
 
-    if TEST:
-        print('checkConfig')
-        print('globals', DB_USER, DB_PWD, DB_HOST, DB_NAME)
-        print()
     if not dbAvailable(dbn=DB_NAME, dbu=DB_USER, dbp=DB_PWD, dbw=DB_HOST):
         print('Problem with database access')
         dict['dbn'] = True
@@ -412,8 +464,6 @@ def checkConfig():
         dict['dbu'] = False
         dict['dbp'] = False
         dict['dbh'] = False
-
-    if dict['isgood'] and TEST: print(' config OK')
 
     return dict
 
@@ -441,7 +491,7 @@ def printUsage():
 
 ###########################
 def main(argv):
-    global CONFIG_DIR, CONFIG_FN, CONFIG_FILE, TEST
+    global CONFIG_DIR, CONFIG_FN, CONFIG_FILE, DEBUG
 
     try:
         opts, args = getopt.getopt(argv, "htc:", ['help', 'test', "config="])
@@ -460,8 +510,8 @@ def main(argv):
                 print('config file does not exist')
                 exit()
         elif opt in ('-t', '--test'):
-            TEST = True
-        if TEST: print('Test flag on')
+            DEBUG = True
+        if DEBUG: print('Test flag on')
 
     if not isfile(CONFIG_FILE):
         print('Cannot locate config file:', CONFIG_FILE)
@@ -476,13 +526,13 @@ def main(argv):
                     tmp_cnf = CONFIG_DIR
                 else:
                     tmp_cnf = expanduser(tmp_cnf)
-                if not checkDir(tmp_cnf):
+                if not checkdir(tmp_cnf):
                     print('Cannot create config file directory', tmp_cnf)
                 else:
                     CONFIG_FILE = tmp_cnf + CONFIG_FN
                     dir_done = True
 
-            if not inputConfig():
+            if not inputconfig():
                 print('inputConfig failed -- exiting')
                 exit()
         else:
@@ -493,23 +543,21 @@ def main(argv):
     if not chk_config['isgood']:
         print('Problem with config. Would you like to enter new config params?', end='')
         if input('') == 'y':
-            inputConfig(**chk_config)
+            inputconfig(**chk_config)
     del chk_config['isgood']
+    # Initial config check done
     done = False
-    msg = 'Config options: (s)how, (e)dit or e(x)it?'
-    while not done:
-        ans = input(msg)
-        if ans == 's':
-            showConfig()
-        elif ans == 'e':
-            chk_config = checkConfig() # ugh! Fix this
-            del chk_config['isgood']
-            inputConfig(**chk_config)
-        elif ans == 'x':
+    menu = ""
+    while not done: # Main Menu
+        menu = domainmenu()
+        if menu == '1':
+            obj_capture()
+        elif menu == '2':
+            list_obj()
+        elif menu == '3':
+            config_menu()
+        elif menu == 'x':
             done = True
-
-
-# Phew! config stuff done!
 
 ################################
 
